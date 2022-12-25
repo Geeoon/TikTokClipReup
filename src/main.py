@@ -20,6 +20,9 @@ size = (1080, 1920)  # tiktok resolution. it may be slightly different
 primary_cap = cv2.VideoCapture(PRIMARY_PATH)
 secondary_cap = cv2.VideoCapture(secondary_video_paths[secondary_index])
 primary_height = int(size[0] / primary_cap.get(cv2.CAP_PROP_FRAME_WIDTH) * primary_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+crop_primary = primary_cap.get(cv2.CAP_PROP_FRAME_WIDTH) / primary_cap.get(cv2.CAP_PROP_FRAME_HEIGHT) > 4./3.  # if primary video is too wide, crop
+if crop_primary:  # if primary video is too wide, crop
+	primary_height = int(size[0] / 4. * 3.)
 secondary_height = size[1] - primary_height
 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
 out = cv2.VideoWriter('output_temp.mp4', fourcc, primary_cap.get(cv2.CAP_PROP_FPS), size)
@@ -33,20 +36,23 @@ while primary_cap.isOpened():
 		print("No more frames can be read.")
 		break
 	if not ret2:
-		i = i+1
+		i += 1
 		if i >= len(secondary_video_paths):
 			i = 0
 		secondary_cap = cv2.VideoCapture(secondary_video_paths[secondary_index])
 		ret2, secondary_frame = secondary_cap.read()
 	output_frame = blank_frame.copy()
+	if crop_primary:
+		primary_shape = (int(primary_cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(primary_cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
+		clip_amount = int((primary_shape[0] - (4. / 3. * primary_shape[1])) / 2)
+		primary_frame = primary_frame[:, clip_amount:-clip_amount, :]
+
 	primary_frame = cv2.resize(primary_frame, (size[0], primary_height))  # resize frame to fit output
-	# primary_frame = cv2.resize(primary_frame, size)  # resize frame to fit output
-	# secondary_frame = cv2.resize(secondary_frame, (size[0], int()))
 	secondary_shape = (int(secondary_cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(secondary_cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
 	secondary_ratio = secondary_shape[0] / secondary_shape[1]
 	if secondary_ratio > size[0] / secondary_height:
 		# preseve height and clip horizontally
-		secondary_shape = (int(secondary_height * secondary_ratio), secondary_height)
+		secondary_shape = (int(secondary_height * secondary_ratio) - int(secondary_height * secondary_ratio) % 2, secondary_height)
 		secondary_frame = cv2.resize(secondary_frame, secondary_shape)
 		clip_amount = int((secondary_shape[0] - size[0]) / 2)
 		secondary_frame = secondary_frame[:, clip_amount:-clip_amount, :]
